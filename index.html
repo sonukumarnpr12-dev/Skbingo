@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Bingo</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      background: linear-gradient(135deg, green, violet, purple);
+      color: white;
+      margin: 0;
+      padding: 10px;
+    }
+
+    #bingo-board {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 8px;
+      max-width: 95vw;
+      margin: 20px auto;
+      position: relative; / needed for overlay lines /
+    }
+
+    .cell {
+      aspect-ratio: 1 / 1;
+      background: white;
+      color: black;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: clamp(14px, 4vw, 20px);
+      font-weight: bold;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: 0.3s;
+      user-select: none;
+    }
+
+    .cell.marked {
+      background: blue;
+      color: white;
+    }
+
+    / Line overlay /
+    .line {
+      position: absolute;
+      background: red;
+      height: 4px;
+      border-radius: 2px;
+    }
+
+    / Winner overlay /
+    #winner {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: rgba(0,0,0,0.8);
+      color: gold;
+      font-size: 50px;
+      font-weight: bold;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 999;
+      display: none; / hidden until win /
+    }
+
+    / Reset button (always visible) /
+    #reset {
+      position: fixed;
+      top: 10px;
+      left: 15px;
+      font-style: italic;
+      font-size: 20px;
+      color: gold;
+      cursor: pointer;
+      z-index: 1000;
+    }
+
+    / Play Again button (only after win) /
+    #play-again {
+      position: fixed;
+      top: 10px;
+      right: 15px;
+      font-style: italic;
+      font-size: 20px;
+      color: gold;
+      cursor: pointer;
+      display: none; / show only after win /
+      z-index: 1000;
+    }
+  </style>
+</head>
+<body>
+  <h1>🎉 Bingo 🎉</h1>
+  <div id="bingo-board"></div>
+  <div id="winner">🏆 WINNER 🏆</div>
+  <div id="reset">Reset</div>
+  <div id="play-again">Play Again</div>
+
+  <script>
+    const board = document.getElementById("bingo-board");
+    const winnerOverlay = document.getElementById("winner");
+    const playAgainBtn = document.getElementById("play-again");
+    const resetBtn = document.getElementById("reset");
+    let completedLines;
+
+    // Initialize game
+    function initGame() {
+      board.innerHTML = "";
+      winnerOverlay.style.display = "none";
+      playAgainBtn.style.display = "none";
+      completedLines = new Set();
+
+      // Generate numbers 1–25 randomly
+      let numbers = [];
+      while (numbers.length < 25) {
+        let num = Math.floor(Math.random() * 25) + 1;
+        if (!numbers.includes(num)) numbers.push(num);
+      }
+
+      // Create cells
+      numbers.forEach(num => {
+        let cell = document.createElement("div");
+        cell.classList.add("cell");
+        cell.textContent = num;
+
+        cell.addEventListener("click", () => {
+          cell.classList.add("marked"); // permanent blue
+          checkBingo();
+        });
+        cell.addEventListener("touchstart", () => {
+          cell.classList.add("marked");
+          checkBingo();
+        });
+
+        board.appendChild(cell);
+      });
+    }
+
+    function checkBingo() {
+      const cells = document.querySelectorAll(".cell");
+      const size = 5;
+
+      // Convert NodeList to 2D array
+      let grid = [];
+      for (let r = 0; r < size; r++) {
+        grid[r] = [];
+        for (let c = 0; c < size; c++) {
+          grid[r][c] = cells[r * size + c].classList.contains("marked");
+        }
+      }
+
+      // Remove old lines
+      document.querySelectorAll(".line").forEach(line => line.remove());
+
+      // Check rows
+      for (let r = 0; r < size; r++) {
+        if (grid[r].every(marked => marked)) {
+          completedLines.add("row" + r);
+          drawLine(r, "row");
+        }
+      }
+
+      // Check columns
+      for (let c = 0; c < size; c++) {
+        let colComplete = true;
+        for (let r = 0; r < size; r++) {
+          if (!grid[r][c]) colComplete = false;
+        }
+        if (colComplete) {
+          completedLines.add("col" + c);
+          drawLine(c, "col");
+        }
+      }
+
+      // Check diagonals
+      let mainDiag = true;
+      let antiDiag = true;
+      for (let i = 0; i < size; i++) {
+        if (!grid[i][i]) mainDiag = false;
+        if (!grid[i][size - i - 1]) antiDiag = false;
+      }
+      if (mainDiag) {
+        completedLines.add("mainDiag");
+        drawLine(0, "mainDiag");
+      }
+      if (antiDiag) {
+        completedLines.add("antiDiag");
+        drawLine(0, "antiDiag");
+      }
+
+      // Show winner if 5 lines completed
+      if (completedLines.size >= 5) {
+        winnerOverlay.style.display = "flex";
+        playAgainBtn.style.display = "block";
+      }
+    }
+
+    function drawLine(index, type) {
+      const line = document.createElement("div");
+      line.classList.add("line");
+
+      const boardRect = board.getBoundingClientRect();
+
+      if (type === "row") {
+        line.style.width = boardRect.width + "px";
+        line.style.left = "0px";
+        line.style.top = (index * (boardRect.height / 5) + (boardRect.height / 10) - 2) + "px";
+      } else if (type === "col") {
+        line.style.height = boardRect.height + "px";
+        line.style.width = "4px";
+        line.style.left = (index * (boardRect.width / 5) + (boardRect.width / 10) - 2) + "px";
+        line.style.top = "0px";
+      } else if (type === "mainDiag") {
+        line.style.width = Math.sqrt(boardRect.width2 + boardRect.height2) + "px";
+        line.style.left = "0px";
+        line.style.top = "0px";
+        line.style.transform = "rotate(45deg)";
+        line.style.transformOrigin = "left top";
+      } else if (type === "antiDiag") {
+        line.style.width = Math.sqrt(boardRect.width2 + boardRect.height2) + "px";
+        line.style.right = "0px";
+        line.style.top = "0px";
+        line.style.transform = "rotate(-45deg)";
+        line.style.transformOrigin = "right top";
+      }
+
+      board.appendChild(line);
+    }
+
+    // Restart game when Play Again clicked
+    playAgainBtn.addEventListener("click", initGame);
+
+    // Reset board anytime
+    resetBtn.addEventListener("click", initGame);
+
+    // Start first game
+    initGame();
+  </script>
+</body>
+</html>
